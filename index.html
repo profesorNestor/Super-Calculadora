@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Súper Calculadora Científica y Gráfica con CAS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Calculadora científica avanzada con sistema de álgebra computacional (CAS) usando Python (SymPy) en el navegador. Realiza derivadas, integrales, resuelve ecuaciones, operaciones con matrices, gráficas y más.">
+    <meta name="keywords" content="calculadora, científica, simbólica, CAS, Python, SymPy, Pyodide, MathJax, Plotly, Néstor Fabio Montoya Palacios, Gemini AI">
+
+    <!-- Frameworks y Librerías -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" charset="utf-8"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <style>
+        /*--------------------------------------------------*/
+        /*-- 1. CONFIGURACIÓN GENERAL Y VARIABLES CSS   ----*/
+        /*--------------------------------------------------*/
+        :root {
+            --bg-main: #1a1b26;
+            --bg-calculator: #24283b;
+            --bg-display: #16161e;
+            --bg-button: #414868;
+            --bg-button-hover: #565f89;
+            --bg-button-op: #7aa2f7;
+            --bg-button-op-hover: #9ecef7;
+            --bg-button-func: #bb9af7;
+            --bg-button-func-hover: #d7bcfc;
+            --text-main: #c0caf5;
+            --text-bright: #ffffff;
+            --text-display: #a9b1d6;
+            --border-color: #565f89;
+            --shadow-color: rgba(0, 0, 0, 0.4);
+            --success-color: #9ece6a;
+            --error-color: #f7768e;
+            --font-main: 'Inter', 'Segoe UI', sans-serif;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Fira+Code&display=swap');
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        /*--------------------------------------------------*/
+        /*-- 2. CONTENEDOR PRINCIPAL DE LA CALCULADORA  ----*/
+        /*--------------------------------------------------*/
+        .calculator-container {
+            width: 100%;
+            max-width: 1200px;
+            background-color: var(--bg-calculator);
+            border-radius: 24px;
+            box-shadow: 0 20px 50px var(--shadow-color);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border: 1px solid var(--border-color);
+            position: relative; /* Para posicionar botones de ayuda/teclado */
+        }
+
+        header {
+            text-align: center;
+            padding-bottom: 15px;
+        }
+
+        header h1 {
+            color: var(--text-bright);
+            margin: 0;
+            font-size: 2em;
+        }
+        
+        header .subtitle {
+            font-size: 1em;
+            color: var(--bg-button-op);
+            font-weight: 500;
+        }
+        
+        .header-icons {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .header-icons button {
+            background: var(--bg-button);
+            color: var(--text-main);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .header-icons button:hover {
+            background: var(--bg-button-hover);
+            transform: scale(1.1);
+        }
+        #keyboard-toggle-btn {
+            display: none; /* Oculto por defecto, se muestra con media query */
+        }
+
+
+        /*--------------------------------------------------*/
+        /*-- 3. PANTALLA DE ENTRADA Y RESULTADOS      ----*/
+        /*--------------------------------------------------*/
+        .display-area {
+            background: var(--bg-display);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.3);
+            border-top: 1px solid var(--border-color);
+            padding-top: 25px;
+        }
+
+        #expression-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--text-bright);
+            font-family: 'Fira Code', monospace;
+            font-size: 1.8em;
+            text-align: right;
+            padding: 10px;
+            outline: none;
+        }
+
+        #result-output {
+            min-height: 80px;
+            padding: 15px;
+            font-size: 2.2em;
+            text-align: right;
+            color: var(--success-color);
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+        }
+        #result-output.error {
+            color: var(--error-color);
+            font-size: 1em;
+            white-space: normal;
+        }
+
+        /*--------------------------------------------------*/
+        /*-- 4. ZONA DE CONTROLES Y BOTONES           ----*/
+        /*--------------------------------------------------*/
+        .controls-and-keypad {
+            display: grid;
+            grid-template-columns: 3fr 1fr;
+            gap: 20px;
+        }
+
+        .main-keypad-area {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .keypad-modes {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 12px;
+        }
+
+        .angle-btn-group {
+            grid-column: span 3;
+            display: flex;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .angle-btn-group .angle-btn {
+            flex: 1;
+            border: none;
+            background: var(--bg-button);
+            color: var(--text-main);
+            padding: 10px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .angle-btn-group .angle-btn:not(:last-child) {
+            border-right: 1px solid var(--border-color);
+        }
+
+        .angle-btn-group .angle-btn.active {
+            background-color: var(--bg-button-op);
+            color: var(--bg-main);
+        }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 12px;
+        }
+
+        .keypad button {
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            font-weight: 500;
+            padding: 18px 10px;
+            border: none;
+            border-radius: 12px;
+            background-color: var(--bg-button);
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            border-bottom: 2px solid rgba(0,0,0,0.3);
+        }
+
+        .keypad button:hover {
+            background-color: var(--bg-button-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        .keypad button:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .keypad .op-btn { background-color: var(--bg-button-op); color: var(--bg-main); }
+        .keypad .op-btn:hover { background-color: var(--bg-button-op-hover); }
+        
+        .keypad .func-btn { background-color: var(--bg-button-func); color: var(--bg-main); }
+        .keypad .func-btn:hover { background-color: var(--bg-button-func-hover); }
+
+        .keypad .ac-btn { background-color: #f7768e; color: var(--bg-main); }
+        .keypad .ac-btn:hover { background-color: #ff9e64; }
+
+        .keypad .sd-btn.active {
+            background-color: var(--success-color);
+            color: var(--bg-main);
+        }
+
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: var(--bg-display);
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .control-panel label {
+            font-weight: 500;
+            color: var(--bg-button-op);
+        }
+
+        .control-panel select, .control-panel button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-button);
+            color: var(--text-main);
+            font-size: 1em;
+        }
+        
+        .control-panel select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%237aa2f7' class='bi bi-chevron-down' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+
+        #calculate-btn {
+            background-color: var(--success-color);
+            color: var(--bg-main);
+            font-weight: bold;
+            font-size: 1.2em;
+            cursor: pointer;
+        }
+        #calculate-btn:disabled {
+            background-color: #414868;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        /*--------------------------------------------------*/
+        /*-- 5. GRÁFICA, AYUDA Y MODALES              ----*/
+        /*--------------------------------------------------*/
+        .plot-container {
+            position: relative;
+        }
+        #plot-area {
+            background: #fff;
+            border-radius: 12px;
+            padding: 10px;
+            min-height: 450px;
+        }
+        #config-plot-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: none; /* Oculto hasta que haya una gráfica */
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2em;
+            color: #333;
+            z-index: 10;
+        }
+        #config-plot-btn:hover {
+            background: #fff;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+            animation: fadeIn 0.3s;
+        }
+        .modal-content {
+            background-color: var(--bg-calculator);
+            margin: 5% auto;
+            padding: 30px;
+            border: 1px solid var(--border-color);
+            width: 90%;
+            max-width: 800px;
+            border-radius: 16px;
+            animation: slideIn 0.4s;
+        }
+        .modal-content h2 { color: var(--bg-button-op); }
+        .modal-content h4 { color: var(--bg-button-op-hover); margin-top: 25px; border-top: 1px solid var(--border-color); padding-top: 15px;}
+        .modal-content code {
+            background-color: var(--bg-display);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            color: var(--success-color);
+        }
+        .close-btn {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #plot-config-modal .modal-content {
+            max-width: 400px;
+        }
+        .config-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .config-item label {
+            font-weight: 500;
+        }
+        .config-item input[type="color"] {
+            width: 50px;
+            height: 30px;
+            border: none;
+            background: none;
+            cursor: pointer;
+        }
+        .config-item input[type="range"] {
+            width: 150px;
+        }
+        .config-item select {
+            background: var(--bg-button);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 5px;
+        }
+
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /*--------------------------------------------------*/
+        /*-- 6. FOOTER Y RESPONSIVIDAD                ----*/
+        /*--------------------------------------------------*/
+        footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.9em;
+            color: #8a93bb;
+        }
+
+        @media (max-width: 900px) {
+            .controls-and-keypad {
+                grid-template-columns: 1fr;
+            }
+        }
+        /* Media Query para dispositivos táctiles/móviles */
+        @media (hover: none) and (pointer: coarse) {
+            #keyboard-toggle-btn {
+                display: flex;
+            }
+        }
+        @media (max-width: 600px) {
+            body { padding: 5px; }
+            .calculator-container { padding: 15px; }
+            header h1 { font-size: 1.5em; }
+            .header-icons { top: 15px; right: 15px; }
+            .header-icons button { width: 35px; height: 35px; }
+            #expression-input { font-size: 1.4em; }
+            #result-output { font-size: 1.8em; }
+            .keypad { gap: 8px; }
+            .keypad button { padding: 15px 8px; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="calculator-container">
+    <header>
+        <h1>Súper Calculadora Científica</h1>
+        <p class="subtitle">Potenciada por Python (SymPy + Pyodide)</p>
+    </header>
+    <div class="header-icons">
+        <button id="keyboard-toggle-btn" title="Mostrar/Ocultar Teclado"><i class="fas fa-keyboard"></i></button>
+        <button id="help-btn" title="Ayuda"><i class="fas fa-question-circle"></i></button>
+    </div>
+
+    <div class="display-area">
+        <input type="text" id="expression-input" placeholder="0" autofocus>
+        <div id="result-output">Esperando para iniciar Pyodide...</div>
+    </div>
+
+    <div class="controls-and-keypad">
+        <div class="main-keypad-area">
+            <div class="keypad-modes">
+                 <div class="angle-btn-group" id="angle-mode-group">
+                    <button id="deg-btn" class="angle-btn" title="Grados (Degrees)">D</button>
+                    <button id="rad-btn" class="angle-btn active" title="Radianes">R</button>
+                    <button id="gra-btn" class="angle-btn" title="Gradianes">G</button>
+                </div>
+            </div>
+            <div class="keypad" id="keypad">
+                <!-- Fila 1 -->
+                <button data-insert="sin()">sin</button>
+                <button data-insert="cos()">cos</button>
+                <button data-insert="tan()">tan</button>
+                <button data-insert="asin()">sin⁻¹</button>
+                <button data-insert="acos()">cos⁻¹</button>
+                <button data-insert="atan()">tan⁻¹</button>
+                <button class="ac-btn" id="clear-btn">AC</button>
+                
+                <!-- Fila 2 -->
+                <button data-insert="sinh()">sinh</button>
+                <button data-insert="cosh()">cosh</button>
+                <button data-insert="tanh()">tanh</button>
+                <button data-insert="asinh()">sinh⁻¹</button>
+                <button data-insert="acosh()">cosh⁻¹</button>
+                <button data-insert="atanh()">atanh⁻¹</button>
+                <button data-insert="**" class="func-btn">x<sup>y</sup></button>
+
+                <!-- Fila 3 -->
+                <button data-insert="log10()">log₁₀</button>
+                <button data-insert="log()">ln</button>
+                <button data-insert="exp()">eˣ</button>
+                <button data-insert="sqrt()">√</button>
+                <button data-insert="pi">π</button>
+                <button data-insert="E">e</button>
+                <button class="op-btn" data-insert="/">÷</button>
+
+                <!-- Fila 4 -->
+                <button data-insert="7">7</button>
+                <button data-insert="8">8</button>
+                <button data-insert="9">9</button>
+                <button data-insert="(">(</button>
+                <button data-insert=")">)</button>
+                <button data-insert="Matrix([[]])">Matriz</button>
+                <button class="op-btn" data-insert="*">×</button>
+
+                <!-- Fila 5 -->
+                <button data-insert="4">4</button>
+                <button data-insert="5">5</button>
+                <button data-insert="6">6</button>
+                <button data-insert="x">x</button>
+                <button data-insert="y">y</button>
+                <button data-insert="t">t</button>
+                <button class="op-btn" data-insert="-">-</button>
+
+                <!-- Fila 6 -->
+                <button data-insert="1">1</button>
+                <button data-insert="2">2</button>
+                <button data-insert="3">3</button>
+                <button data-insert="s">s</button>
+                <button id="graph-btn" class="func-btn">Graficar</button>
+                <button id="sd-toggle-btn" class="sd-btn" title="Simbólico/Decimal">S↔D</button>
+                <button class="op-btn" data-insert="+">+</button>
+
+                <!-- Fila 7 -->
+                <button data-insert="0" style="grid-column: span 2;">0</button>
+                <button data-insert=".">.</button>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div>
+                <label for="operation-select">Operación Principal:</label>
+                <select id="operation-select">
+                    <optgroup label="Álgebra y Cálculo">
+                        <option value="evaluar">Evaluar/Simplificar</option>
+                        <option value="graficar">Graficar Función de x</option>
+                        <option value="derivar">Derivar (respecto a x)</option>
+                        <option value="integrar">Integrar (respecto a x)</option>
+                        <option value="limite">Límite (x->0)</option>
+                    </optgroup>
+                    <optgroup label="Álgebra Avanzada">
+                        <option value="factorizar">Factorizar</option>
+                        <option value="expandir">Expandir</option>
+                        <option value="resolver">Resolver Ecuación (para x)</option>
+                        <option value="fracciones_parciales">Fracciones Parciales</option>
+                    </optgroup>
+                    <optgroup label="Cálculo Avanzado">
+                        <option value="taylor">Serie de Taylor (en x=0)</option>
+                        <option value="laplace">Transformada de Laplace (t->s)</option>
+                        <option value="laplace_inv">Inv. de Laplace (s->t)</option>
+                        <option value="resolver_edo">Resolver EDO (y(x))</option>
+                    </optgroup>
+                     <optgroup label="Álgebra Lineal">
+                        <option value="determinante">Determinante</option>
+                        <option value="inversa">Matriz Inversa</option>
+                        <option value="valores_propios">Valores/Vectores Propios</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div>
+                <label for="examples-select">Cargar Ejemplo:</label>
+                <select id="examples-select">
+                    <option value="">Selecciona un ejemplo...</option>
+                </select>
+            </div>
+            
+            <button id="calculate-btn" disabled>
+                <i class="fas fa-calculator"></i> Calcular
+            </button>
+        </div>
+    </div>
+
+    <div class="plot-container">
+        <div id="plot-area"></div>
+        <button id="config-plot-btn" title="Configurar Gráfica"><i class="fas fa-palette"></i></button>
+    </div>
+
+    <footer>
+        Creado por Néstor Fabio Montoya Palacios y Gemini AI
+    </footer>
+</div>
+
+<!-- Modal de Ayuda -->
+<div id="help-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn">&times;</span>
+        <h2><i class="fas fa-book"></i> Guía de Uso</h2>
+        <p>Esta calculadora utiliza la sintaxis de <strong>SymPy (Python)</strong>. Aquí tienes algunos consejos:</p>
+        <ul>
+            <li><strong>Modo Angular:</strong> Usa los botones <strong>D, R, G</strong> para cambiar entre Grados (Degrees), Radianes y Gradianes para las operaciones trigonométricas.</li>
+            <li><strong>Potencia:</strong> Usa <code>**</code>. Ejemplo: <code>x**2</code> para x².</li>
+            <li><strong>Multiplicación implícita:</strong> Debes ser explícito. Escribe <code>3*x</code>, no <code>3x</code>.</li>
+            <li><strong>Constantes:</strong> Usa <code>pi</code> para π y <code>E</code> para el número de Euler.</li>
+            <li><strong>Resolver Ecuaciones:</strong> Para resolver <code>x² - 4 = 0</code>, introduce <code>x**2 - 4</code> y selecciona "Resolver Ecuación". Para ecuaciones igualadas a algo distinto de cero, como <code>2*x = 8</code>, reescríbela como <code>2*x - 8</code>.</li>
+            <li><strong>Ecuaciones Diferenciales (EDO):</strong> Define la función como <code>y(x)</code>. Para resolver y' + y = 0, escribe <code>diff(y(x), x) + y(x)</code> y selecciona "Resolver EDO".</li>
+            <li><strong>Matrices:</strong> Usa el formato <code>Matrix([[fila1], [fila2]])</code>. Ejemplo para una matriz 2x2: <code>Matrix([[1, 2], [3, 4]])</code>. El botón "Matriz" inserta una plantilla.</li>
+            <li><strong>Límites:</strong> La opción por defecto calcula el límite cuando x tiende a 0. Para otros valores, usa la sintaxis de SymPy: <code>limit(expresión, x, valor)</code> y selecciona "Evaluar/Simplificar".</li>
+             <li><strong>Transformada de Laplace:</strong> Se asume la transformación de una función de <code>t</code> a una función de <code>s</code>. Asegúrate de que tu expresión use la variable <code>t</code>.</li>
+        </ul>
+        
+        <h4><i class="fas fa-copyright"></i> Derechos de Autor y Licencia</h4>
+        <p>
+            Esta aplicación web, "Súper Calculadora Científica", es una obra intelectual creada y desarrollada por <strong>MSc. Néstor Fabio Montoya Palacios</strong>, con la asistencia de <strong>Gemini AI</strong>.
+        </p>
+        <p>
+            <strong>Todos los derechos están reservados.</strong> Queda estrictamente prohibida la reproducción, distribución, descarga, descompilación, copia o modificación total o parcial del código fuente (HTML, CSS, JavaScript, Python) y de los recursos de esta aplicación sin el consentimiento previo, expreso y por escrito de los autores.
+        </p>
+        <p>
+            El uso de esta herramienta es exclusivamente para fines educativos y de cálculo en línea a través de esta interfaz. Cualquier intento de apropiación, ingeniería inversa o reutilización no autorizada del código para otros proyectos constituirá una violación de los derechos de autor.
+        </p>
+
+    </div>
+</div>
+
+<!-- Modal de Configuración de Gráfica -->
+<div id="plot-config-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn">&times;</span>
+        <h2><i class="fas fa-palette"></i> Configurar Gráfica</h2>
+        <div class="config-panel">
+            <div class="config-item">
+                <label for="plot-color-picker">Color de Curva:</label>
+                <input type="color" id="plot-color-picker" value="#7aa2f7">
+            </div>
+            <div class="config-item">
+                <label for="plot-width-slider">Grosor:</label>
+                <input type="range" id="plot-width-slider" min="1" max="20" value="3">
+            </div>
+            <div class="config-item">
+                <label for="plot-style-select">Estilo de Línea:</label>
+                <select id="plot-style-select">
+                    <option value="solid">Continua</option>
+                    <option value="dash">Rayas</option>
+                    <option value="dot">Punteada</option>
+                    <option value="dashdot">Raya-Punto</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===================================================================================
+// MÓDULO 0: CONFIGURACIÓN Y ESTADO GLOBAL
+// ===================================================================================
+const AppState = {
+    pyodide: null,
+    pyodideReady: false,
+    isDecimalMode: false,
+    angleMode: 'R',
+    lastResult: null,
+    graphConfig: {
+        color: '#7aa2f7',
+        width: 3,
+        style: 'solid'
+    }
+};
+
+// ===================================================================================
+// MÓDULO 1: INICIALIZACIÓN DE PYODIDE
+// ===================================================================================
+async function initPyodide() {
+    const output = document.getElementById('result-output');
+    const calcBtn = document.getElementById('calculate-btn');
+    
+    output.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando Pyodide...';
+    try {
+        AppState.pyodide = await loadPyodide();
+        output.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando SymPy...';
+        await AppState.pyodide.loadPackage('sympy');
+        AppState.pyodideReady = true;
+        output.textContent = 'Calculadora lista.';
+        calcBtn.disabled = false;
+        calcBtn.innerHTML = '<i class="fas fa-calculator"></i> Calcular';
+    } catch (error) {
+        output.textContent = 'Error al cargar Pyodide o SymPy.';
+        output.classList.add('error');
+        console.error("Pyodide/SymPy loading error:", error);
+    }
+}
+
+// ===================================================================================
+// MÓDULO 2: MANEJO DE LA INTERFAZ DE USUARIO (UI)
+// ===================================================================================
+function setupUIListeners() {
+    // Listeners del teclado principal
+    document.getElementById('keypad').addEventListener('click', (e) => {
+        const target = e.target.closest('button');
+        if (!target) return;
+        
+        if (target.dataset.insert) {
+            insertAtCursor(target.dataset.insert);
+        } else if (target.id === 'sd-toggle-btn') {
+            toggleSDMode();
+        } else if (target.id === 'graph-btn') {
+            document.getElementById('operation-select').value = 'graficar';
+            handleCalculation();
+        }
+    });
+
+    document.getElementById('clear-btn').addEventListener('click', () => {
+        document.getElementById('expression-input').value = '';
+        document.getElementById('result-output').textContent = 'Listo.';
+        document.getElementById('result-output').classList.remove('error');
+        AppState.lastResult = null;
+        Plotly.purge('plot-area');
+        document.getElementById('config-plot-btn').style.display = 'none';
+    });
+
+    document.getElementById('calculate-btn').addEventListener('click', handleCalculation);
+    
+    // Listeners de íconos de cabecera
+    document.getElementById('help-btn').onclick = () => openModal('help-modal');
+    document.getElementById('keyboard-toggle-btn').onclick = toggleVirtualKeyboard;
+
+    // Listeners de modos
+    setupAngleModeControls();
+    setupExamples();
+
+    // Listeners de modales
+    setupModal('help-modal');
+    setupModal('plot-config-modal');
+    document.getElementById('config-plot-btn').onclick = () => openModal('plot-config-modal');
+    
+    // Listeners de configuración de gráfica
+    document.getElementById('plot-color-picker').addEventListener('input', updateGraphStyle);
+    document.getElementById('plot-width-slider').addEventListener('input', updateGraphStyle);
+    document.getElementById('plot-style-select').addEventListener('change', updateGraphStyle);
+}
+
+function insertAtCursor(text) {
+    const input = document.getElementById('expression-input');
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const currentVal = input.value;
+
+    if (text.includes('()')) {
+        const funcName = text.slice(0, -2);
+        const newText = funcName + '()';
+        input.value = currentVal.slice(0, start) + newText + currentVal.slice(end);
+        input.selectionStart = input.selectionEnd = start + newText.length - 1;
+    } else if (text.includes('[[]]')) {
+        const newText = 'Matrix([[], []])';
+        input.value = currentVal.slice(0, start) + newText + currentVal.slice(end);
+        input.selectionStart = input.selectionEnd = start + newText.length - 4;
+    } else {
+        input.value = currentVal.slice(0, start) + text + currentVal.slice(end);
+        input.selectionStart = input.selectionEnd = start + text.length;
+    }
+    input.focus();
+}
+
+function toggleSDMode() {
+    AppState.isDecimalMode = !AppState.isDecimalMode;
+    document.getElementById('sd-toggle-btn').classList.toggle('active', AppState.isDecimalMode);
+    if (AppState.lastResult) {
+        displayResult(AppState.lastResult);
+    }
+}
+
+function toggleVirtualKeyboard() {
+    const input = document.getElementById('expression-input');
+    if (input.readOnly) {
+        input.readOnly = false;
+        input.focus();
+    } else {
+        input.readOnly = true;
+        input.blur();
+    }
+}
+
+function setupAngleModeControls() {
+    const angleGroup = document.getElementById('angle-mode-group');
+    angleGroup.addEventListener('click', (e) => {
+        const target = e.target.closest('.angle-btn');
+        if (!target) return;
+
+        if (target.id === 'deg-btn') AppState.angleMode = 'D';
+        else if (target.id === 'rad-btn') AppState.angleMode = 'R';
+        else if (target.id === 'gra-btn') AppState.angleMode = 'G';
+
+        angleGroup.querySelectorAll('.angle-btn').forEach(btn => btn.classList.remove('active'));
+        target.classList.add('active');
+
+        if (document.getElementById('expression-input').value) {
+            handleCalculation();
+        }
+    });
+}
+
+function setupModal(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.querySelector('.close-btn').onclick = () => modal.style.display = 'none';
+    window.addEventListener('click', (event) => {
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    });
+}
+
+function openModal(modalId) {
+    document.getElementById(modalId).style.display = 'block';
+}
+
+// ===================================================================================
+// MÓDULO 3: EJEMPLOS
+// ===================================================================================
+function setupExamples() {
+    const examples = {
+        "Trigonometría (sin(90))": { expr: "sin(90)", op: "evaluar" },
+        "Derivada de un polinomio": { expr: "x**3 + 4*x**2 - 5*x + 2", op: "derivar" },
+        "Integral indefinida": { expr: "cos(x) * exp(x)", op: "integrar" },
+        "Factorizar expresión": { expr: "x**4 - 1", op: "factorizar" },
+        "Resolver ecuación cuadrática": { expr: "x**2 - 6*x + 8", op: "resolver" },
+        "Graficar seno y coseno": { expr: "sin(x) + cos(2*x)", op: "graficar" },
+        "Límite en el infinito": { expr: "limit((1 + 1/x)**x, x, oo)", op: "evaluar" },
+        "Serie de Taylor para e^x": { expr: "exp(x)", op: "taylor" },
+        "Transformada de Laplace": { expr: "t**2 * exp(-2*t)", op: "laplace" },
+        "Inv. de Laplace": { expr: "1/(s**2 + 1)", op: "laplace_inv" },
+        "Resolver EDO simple": { expr: "diff(y(x), x) - 2*y(x)", op: "resolver_edo" },
+        "Determinante de Matriz 3x3": { expr: "Matrix([[1, 2, 3], [4, 5, 6], [7, 8, 9]])", op: "determinante" },
+        "Inversa de Matriz 2x2": { expr: "Matrix([[1, 2], [3, 5]])", op: "inversa" },
+    };
+
+    const select = document.getElementById('examples-select');
+    for (const name in examples) {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+    }
+
+    select.addEventListener('change', (e) => {
+        const exampleName = e.target.value;
+        if (exampleName && examples[exampleName]) {
+            const { expr, op } = examples[exampleName];
+            document.getElementById('expression-input').value = expr;
+            document.getElementById('operation-select').value = op;
+        }
+    });
+}
+
+// ===================================================================================
+// MÓDULO 4: MOTOR DE CÁLCULO (PYODIDE + SYMPY)
+// ===================================================================================
+async function handleCalculation() {
+    if (!AppState.pyodideReady) return;
+
+    const expr = document.getElementById('expression-input').value.trim();
+    const op = document.getElementById('operation-select').value;
+    const output = document.getElementById('result-output');
+    const calcBtn = document.getElementById('calculate-btn');
+
+    if (!expr) {
+        output.textContent = "Por favor, introduce una expresión.";
+        output.classList.add('error');
+        return;
+    }
+
+    output.innerHTML = '<i class="fas fa-cog fa-spin"></i> Calculando...';
+    output.classList.remove('error');
+    calcBtn.disabled = true;
+    
+    if (op !== 'graficar') {
+        Plotly.purge('plot-area');
+        document.getElementById('config-plot-btn').style.display = 'none';
+    }
+
+    try {
+        const pythonScript = buildPythonScript(expr, op, AppState.angleMode);
+        const rawResult = await AppState.pyodide.runPythonAsync(pythonScript);
+        const result = JSON.parse(rawResult);
+        
+        AppState.lastResult = result;
+        displayResult(result);
+
+        if (op === 'graficar' && result.plot) {
+            plotFunction(result.plot);
+            document.getElementById('config-plot-btn').style.display = 'flex';
+        }
+
+    } catch (error) {
+        console.error("Calculation Error:", error);
+        AppState.lastResult = null;
+        output.textContent = `Error: ${error.message || error}`;
+        output.classList.add('error');
+    } finally {
+        calcBtn.disabled = false;
+    }
+}
+
+function buildPythonScript(expression, operation, angleMode) {
+    const sanitizedExpr = expression.replace(/\\/g, '\\\\').replace(/"""/g, '\\"\\"\\"');
+    return `
+import sympy as sp
+import json
+
+x, y, z, t, s = sp.symbols('x y z t s')
+y_func = sp.Function('y')
+
+output = {"latex": "Error", "plain": "Error", "numeric": None, "plot": None}
+
+custom_locals = {}
+angle_mode = "${angleMode}"
+
+if angle_mode == 'D':
+    def sin_d(x): return sp.sin(sp.rad(x))
+    def cos_d(x): return sp.cos(sp.rad(x))
+    def tan_d(x): return sp.tan(sp.rad(x))
+    def asin_d(x): return sp.deg(sp.asin(x))
+    def acos_d(x): return sp.deg(sp.acos(x))
+    def atan_d(x): return sp.deg(sp.atan(x))
+    custom_locals = {'sin': sin_d, 'cos': cos_d, 'tan': tan_d, 'asin': asin_d, 'acos': acos_d, 'atan': atan_d}
+elif angle_mode == 'G':
+    def sin_g(x): return sp.sin(x * sp.pi / 200)
+    def cos_g(x): return sp.cos(x * sp.pi / 200)
+    def tan_g(x): return sp.tan(x * sp.pi / 200)
+    def asin_g(x): return sp.asin(x) * 200 / sp.pi
+    def acos_g(x): return sp.acos(x) * 200 / sp.pi
+    def atan_g(x): return sp.atan(x) * 200 / sp.pi
+    custom_locals = {'sin': sin_g, 'cos': cos_g, 'tan': tan_g, 'asin': asin_g, 'acos': acos_g, 'atan': atan_g}
+
+base_locals = {
+    'x': x, 'y': y, 'z': z, 't': t, 's': s, 'y': y_func, 'Matrix': sp.Matrix, 
+    'limit': sp.limit, 'oo': sp.oo, 'diff': sp.diff, 'integrate': sp.integrate, 
+    'factor': sp.factor, 'expand': sp.expand, 'solve': sp.solve, 'apart': sp.apart, 
+    'series': sp.series, 'laplace_transform': sp.laplace_transform, 
+    'inverse_laplace_transform': sp.inverse_laplace_transform, 'dsolve': sp.dsolve, 
+    'sin': sp.sin, 'cos': sp.cos, 'tan': sp.tan, 'asin': sp.asin, 'acos': sp.acos, 'atan': sp.atan,
+    'sinh': sp.sinh, 'cosh': sp.cosh, 'tanh': sp.tanh, 'asinh': sp.asinh, 'acosh': sp.acosh, 'atanh': sp.atanh,
+    'log10': lambda arg: sp.log(arg, 10), 'log': sp.log, 'exp': sp.exp, 'sqrt': sp.sqrt, 'pi': sp.pi, 'E': sp.E
+}
+final_locals = {**base_locals, **custom_locals}
+
+try:
+    expr = sp.sympify("""${sanitizedExpr}""", locals=final_locals)
+    op = "${operation}"
+    result = None
+
+    if op == "evaluar": result = sp.simplify(expr)
+    elif op == "derivar": result = sp.diff(expr, x)
+    elif op == "integrar": result = sp.integrate(expr, x)
+    elif op == "factorizar": result = sp.factor(expr)
+    elif op == "expandir": result = sp.expand(expr)
+    elif op == "resolver": result = sp.solve(expr, x)
+    elif op == "limite": result = sp.limit(expr, x, 0)
+    elif op == "fracciones_parciales": result = sp.apart(expr, x)
+    elif op == "taylor": result = sp.series(expr, x, 0, 6).doit().removeO()
+    elif op == "laplace": result = sp.laplace_transform(expr, t, s, noconds=True)
+    elif op == "laplace_inv": result = sp.inverse_laplace_transform(expr, s, t)
+    elif op == "resolver_edo": result = sp.dsolve(expr, y_func(x))
+    elif op == "determinante": result = expr.det()
+    elif op == "inversa": result = expr.inv()
+    elif op == "valores_propios": result = expr.eigenvects()
+    elif op == "graficar":
+        from sympy.printing.jscode import jscode
+        output["plot"] = {"js_function_body": jscode(expr), "expression_latex": sp.latex(expr)}
+        result = expr
+    else: result = expr
+
+    if result is not None:
+        output["latex"] = sp.latex(result)
+        output["plain"] = str(result)
+        try:
+            if hasattr(result, 'evalf'):
+                 output["numeric"] = sp.latex(result.evalf(30))
+            elif isinstance(result, (list, tuple)):
+                numeric_list = [item.evalf(30) for item in result if hasattr(item, 'evalf')]
+                output["numeric"] = sp.latex(numeric_list)
+        except Exception: pass
+
+except Exception as e:
+    output["latex"] = f"Error: {str(e)}"
+    output["plain"] = f"Error: {str(e)}"
+
+json.dumps(output)
+    `;
+}
+
+// ===================================================================================
+// MÓDULO 5: VISUALIZACIÓN DE RESULTADOS Y GRÁFICAS
+// ===================================================================================
+function displayResult(result) {
+    const output = document.getElementById('result-output');
+    
+    if (!result || result.latex.startsWith("Error:")) {
+        output.textContent = result ? result.plain : "Error al mostrar resultado.";
+        output.classList.add('error');
+        return;
+    }
+    
+    output.classList.remove('error');
+    let finalLatex = result.latex;
+    if (AppState.isDecimalMode && result.numeric) {
+        finalLatex = result.numeric;
+    }
+
+    output.innerHTML = `\\(${finalLatex}\\)`;
+    if (window.MathJax) {
+        MathJax.typesetPromise([output]).catch((err) => console.log('MathJax error:', err));
+    }
+}
+
+function plotFunction(plotData) {
+    const plotArea = document.getElementById('plot-area');
+    try {
+        const func = new Function("x", `with(Math){return ${plotData.js_function_body}}`);
+        
+        const xValues = [], yValues = [];
+        const step = 0.05;
+        for (let i = -10; i <= 10; i += step) {
+            xValues.push(i);
+            let yVal = null;
+            try {
+                const res = func(i);
+                if (Number.isFinite(res)) yVal = res;
+            } catch (e) { /* Ignorar */ }
+            yValues.push(yVal);
+        }
+
+        const trace = {
+            x: xValues, y: yValues,
+            type: 'scatter', mode: 'lines',
+            line: { 
+                color: AppState.graphConfig.color, 
+                width: AppState.graphConfig.width,
+                dash: AppState.graphConfig.style
+            }
+        };
+
+        const layout = {
+            title: `Gráfica de \\( y = ${plotData.expression_latex} \\)`,
+            xaxis: { title: 'x' }, yaxis: { title: 'y' },
+            paper_bgcolor: '#ffffff', plot_bgcolor: '#f0f0f0',
+            font: { family: 'var(--font-main)', color: 'var(--bg-main)' },
+            margin: { l: 50, r: 30, b: 40, t: 60 },
+        };
+        
+        const config = {
+            responsive: true,
+            scrollZoom: true
+        };
+
+        Plotly.newPlot(plotArea, [trace], layout, config);
+
+    } catch (error) {
+        plotArea.innerHTML = `<p class="error">Error al graficar: ${error.message}</p>`;
+        console.error("Plotting error:", error);
+    }
+}
+
+function updateGraphStyle() {
+    const color = document.getElementById('plot-color-picker').value;
+    const width = document.getElementById('plot-width-slider').value;
+    const style = document.getElementById('plot-style-select').value;
+
+    AppState.graphConfig = { color, width, style };
+
+    Plotly.restyle('plot-area', {
+        'line.color': color,
+        'line.width': width,
+        'line.dash': style
+    });
+}
+
+
+// ===================================================================================
+// PUNTO DE ENTRADA PRINCIPAL
+// ===================================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    setupUIListeners();
+    initPyodide();
+});
+
+</script>
+</body>
+</html>
