@@ -347,6 +347,8 @@
             max-width: 800px;
             border-radius: 16px;
             animation: slideIn 0.4s;
+            display: flex;
+            flex-direction: column;
         }
         .modal-content h2 { color: var(--bg-button-op); }
         .modal-content h4 { color: var(--bg-button-op-hover); margin-top: 25px; border-top: 1px solid var(--border-color); padding-top: 15px;}
@@ -359,7 +361,7 @@
         }
         .close-btn {
             color: #aaa;
-            float: right;
+            align-self: flex-end;
             font-size: 28px;
             font-weight: bold;
             cursor: pointer;
@@ -397,6 +399,38 @@
             border: 1px solid var(--border-color);
             border-radius: 5px;
             padding: 5px;
+        }
+        
+        #ai-assistant-modal .modal-content {
+            height: 80vh;
+            max-width: 600px;
+            padding: 15px;
+        }
+        #ai-assistant-frame {
+            flex-grow: 1;
+            border: none;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+        }
+
+        #copyright-toast {
+            position: fixed;
+            bottom: -100px; /* Start off-screen */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--bg-button-op);
+            color: var(--bg-main);
+            padding: 15px 25px;
+            border-radius: 10px;
+            z-index: 2000;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: bottom 0.5s ease-in-out;
+            pointer-events: none;
+        }
+        #copyright-toast.show {
+            bottom: 30px;
         }
 
 
@@ -447,6 +481,7 @@
         <p class="subtitle">Potenciada por Python (SymPy + Pyodide)</p>
     </header>
     <div class="header-icons">
+        <button id="ai-assistant-btn" title="Asistente IA"><i class="fas fa-robot"></i></button>
         <button id="keyboard-toggle-btn" title="Mostrar/Ocultar Teclado"><i class="fas fa-keyboard"></i></button>
         <button id="help-btn" title="Ayuda"><i class="fas fa-question-circle"></i></button>
     </div>
@@ -579,6 +614,9 @@
     </footer>
 </div>
 
+<!-- Toast para mensaje de Copyright -->
+<div id="copyright-toast"></div>
+
 <!-- Modal de Ayuda -->
 <div id="help-modal" class="modal">
     <div class="modal-content">
@@ -638,6 +676,14 @@
     </div>
 </div>
 
+<!-- Modal del Asistente IA -->
+<div id="ai-assistant-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn">&times;</span>
+        <iframe id="ai-assistant-frame"></iframe>
+    </div>
+</div>
+
 <script>
 // ===================================================================================
 // MÓDULO 0: CONFIGURACIÓN Y ESTADO GLOBAL
@@ -654,6 +700,149 @@ const AppState = {
         style: 'solid'
     }
 };
+
+const ASISTENTE_HTML_CONTENT = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Asistente IA</title>
+        <style>
+            :root {
+                --bg-main: #1a1b26;
+                --text-main: #c0caf5;
+                --bg-user: #7aa2f7;
+                --bg-ai: #414868;
+                --text-bubble: #ffffff;
+            }
+            body {
+                font-family: 'Inter', 'Segoe UI', sans-serif;
+                background-color: var(--bg-main);
+                color: var(--text-main);
+                margin: 0;
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+                overflow: hidden;
+            }
+            .chat-window {
+                flex-grow: 1;
+                overflow-y: auto;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+            .chat-bubble {
+                padding: 10px 15px;
+                border-radius: 18px;
+                max-width: 80%;
+                word-wrap: break-word;
+            }
+            .user-bubble {
+                background-color: var(--bg-user);
+                color: var(--text-bubble);
+                align-self: flex-end;
+                border-bottom-right-radius: 4px;
+            }
+            .ai-bubble {
+                background-color: var(--bg-ai);
+                color: var(--text-bubble);
+                align-self: flex-start;
+                border-bottom-left-radius: 4px;
+            }
+            .input-area {
+                display: flex;
+                padding: 15px;
+                border-top: 1px solid #565f89;
+            }
+            .input-area input {
+                flex-grow: 1;
+                background: #16161e;
+                border: 1px solid #565f89;
+                border-radius: 20px;
+                padding: 10px 15px;
+                color: var(--text-main);
+                font-size: 1em;
+                outline: none;
+            }
+            .input-area button {
+                background: var(--bg-user);
+                border: none;
+                color: white;
+                font-size: 1.2em;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                margin-left: 10px;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="chat-window" id="chat-window">
+            <div class="ai-bubble">
+                ¡Hola! Soy tu asistente de IA. ¿Cómo puedo ayudarte con tus cálculos hoy?
+            </div>
+        </div>
+        <div class="input-area">
+            <input type="text" id="chat-input" placeholder="Escribe tu pregunta...">
+            <button id="send-btn">➤</button>
+        </div>
+        
+        <script>
+            const chatWindow = document.getElementById('chat-window');
+            const chatInput = document.getElementById('chat-input');
+            const sendBtn = document.getElementById('send-btn');
+
+            const responses = {
+                "derivada": "Para calcular una derivada, escribe la función en la pantalla principal, por ejemplo 'x**3', y selecciona 'Derivar' en el menú de operaciones.",
+                "integral": "Para una integral, escribe la función como 'sin(x)' y elige 'Integrar' en el menú. ¡Recuerda que no se añade la constante de integración!",
+                "graficar": "Escribe la función que deseas ver, como 'exp(-x**2)', y presiona el botón 'Graficar' o selecciona la opción en el menú.",
+                "hola": "¡Hola! Estoy aquí para ayudarte. Pregúntame sobre cómo derivar, integrar, resolver ecuaciones y más.",
+                "gracias": "¡De nada! Si tienes más preguntas, no dudes en consultarme."
+            };
+
+            function addMessage(text, sender) {
+                const bubble = document.createElement('div');
+                bubble.classList.add('chat-bubble', sender + '-bubble');
+                bubble.textContent = text;
+                chatWindow.appendChild(bubble);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+
+            function handleSend() {
+                const userText = chatInput.value.trim();
+                if (!userText) return;
+
+                addMessage(userText, 'user');
+                chatInput.value = '';
+
+                setTimeout(() => {
+                    let aiResponse = "Lo siento, no entiendo esa pregunta. Intenta preguntarme sobre cómo 'derivar', 'integrar' o 'graficar'.";
+                    const lowerUserText = userText.toLowerCase();
+                    for (const key in responses) {
+                        if (lowerUserText.includes(key)) {
+                            aiResponse = responses[key];
+                            break;
+                        }
+                    }
+                    addMessage(aiResponse, 'ai');
+                }, 600);
+            }
+
+            sendBtn.addEventListener('click', handleSend);
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleSend();
+                }
+            });
+        </` + `script>
+    </body>
+    </html>
+`;
+
 
 // ===================================================================================
 // MÓDULO 1: INICIALIZACIÓN DE PYODIDE
@@ -709,7 +898,6 @@ function setupUIListeners() {
     document.getElementById('calculate-btn').addEventListener('click', handleCalculation);
     
     // Listeners de íconos de cabecera
-    document.getElementById('help-btn').onclick = () => openModal('help-modal');
     document.getElementById('keyboard-toggle-btn').onclick = toggleVirtualKeyboard;
 
     // Listeners de modos
@@ -717,14 +905,18 @@ function setupUIListeners() {
     setupExamples();
 
     // Listeners de modales
-    setupModal('help-modal');
-    setupModal('plot-config-modal');
-    document.getElementById('config-plot-btn').onclick = () => openModal('plot-config-modal');
+    setupAllModals();
     
     // Listeners de configuración de gráfica
     document.getElementById('plot-color-picker').addEventListener('input', updateGraphStyle);
     document.getElementById('plot-width-slider').addEventListener('input', updateGraphStyle);
     document.getElementById('plot-style-select').addEventListener('change', updateGraphStyle);
+    
+    // Deshabilitar clic derecho
+    document.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        showCopyrightToast();
+    });
 }
 
 function insertAtCursor(text) {
@@ -787,19 +979,61 @@ function setupAngleModeControls() {
     });
 }
 
-function setupModal(modalId) {
-    const modal = document.getElementById(modalId);
-    modal.querySelector('.close-btn').onclick = () => modal.style.display = 'none';
-    window.addEventListener('click', (event) => {
-        if (event.target == modal) {
-            modal.style.display = 'none';
+function setupAllModals() {
+    const modals = [
+        { btnId: 'help-btn', modalId: 'help-modal' },
+        { btnId: 'ai-assistant-btn', modalId: 'ai-assistant-modal' },
+        { btnId: 'config-plot-btn', modalId: 'plot-config-modal' }
+    ];
+
+    modals.forEach(({ btnId, modalId }) => {
+        const openBtn = document.getElementById(btnId);
+        const modal = document.getElementById(modalId);
+        if (!openBtn || !modal) return;
+
+        const closeBtn = modal.querySelector('.close-btn');
+
+        openBtn.addEventListener('click', () => {
+            if (modalId === 'ai-assistant-modal') {
+                loadAssistantIframeOnce();
+            }
+            modal.style.display = 'block';
+        });
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
         }
+
+        window.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
     });
 }
 
-function openModal(modalId) {
-    document.getElementById(modalId).style.display = 'block';
+let assistantLoaded = false;
+function loadAssistantIframeOnce() {
+    if (assistantLoaded) return;
+    const iframe = document.getElementById('ai-assistant-frame');
+    if (iframe) {
+        iframe.srcdoc = ASISTENTE_HTML_CONTENT;
+        assistantLoaded = true;
+    }
 }
+
+function showCopyrightToast() {
+    let toast = document.getElementById('copyright-toast');
+    if (!toast) return; // Salir si el toast no existe
+    toast.innerHTML = '&copy; Derechos Reservados: Néstor F. Montoya y Gemini AI.';
+    toast.classList.add('show');
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 3000);
+}
+
 
 // ===================================================================================
 // MÓDULO 3: EJEMPLOS
